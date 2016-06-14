@@ -1,4 +1,4 @@
-= Scheme-odbc
+* Scheme-odbc
 
 this is library for chez-scheme connecting to ODBC datasources.
 
