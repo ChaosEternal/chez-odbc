@@ -47,14 +47,10 @@
 					    message-bv
 					    message-l-bv)))
 		 (if (eq? r SQL_SUCCESS)
-		     (let* ([state (bytevector->string
-				    (bytevector-truncate! state-bv 5)
-				    (make-transcoder (utf-8-codec)))]
-			    [nsi (bytevector-s16-native-ref native-state-int-bv 0)]
-			    [l (bytevector-s16-native-ref message-l-bv 0)]
-			    [mess (bytevector->string
-				(bytevector-truncate! message-bv (- l 1))
-				(make-transcoder (utf-8-codec)))])
+		     (let* ([state (bv->string-with-length! state-bv 5)]
+			    [nsi (dbi-sql-bv-parse-sshort native-state-int-bv)]
+			    [l (dbi-sql-bv-parse-sshort message-l-bv)]
+			    [mess (bv->string-with-length! message-bv (- l 1))])
 		       (lp i (format #f "~a ERROR: ~a: ~a:~a:~a\n" m i
 				     state nsi mess)))
 		     (make-message-condition m)))))))
@@ -88,7 +84,7 @@
 	   (res (call-check-res
 		 what (lambda ()
 			(proc in-handle out-bv)) in-handle)))
-      (bytevector-s64-native-ref out-bv 0)))
+      (dbi-sql-bv-parse-sbigint out-bv)))
 
   (define (dbi-get-row-count stmt-handle)
     (dbi-call-and-get-long f-sql-row-count SQL_HANDLE_STMT stmt-handle))
@@ -125,13 +121,12 @@
 		(let* ([out-dsn-bv (make-bytevector 1024 0)]
 		       [out-dsn-l-bv (make-bytevector 4 0)]
 		       [res (dbi-do-connect dbc-handle dsn out-dsn-bv out-dsn-l-bv)]
-		       [out-dsn-l (bytevector-s16-native-ref out-dsn-l-bv 0)]
-		       [out-dsn (bytevector->string (bytevector-truncate!
-						     out-dsn-bv
-						     (if (>  out-dsn-l 0)
-							 (- out-dsn-l 1)
-							 0))
-						    (make-transcoder (utf-8-codec)))])
+		       [out-dsn-l (dbi-sql-bv-parse-sshort out-dsn-l-bv)]
+		       [out-dsn (bv->string-with-length!
+				 out-dsn-bv
+				 (if (>  out-dsn-l 0)
+				     (- out-dsn-l 1)
+				     0))])
 		  (make-odbc-dbi-connection env-handle dbc-handle
 					    out-dsn)))))))))
   ;; input: dsn_without_"DSN=" uid [pwd]
@@ -227,7 +222,7 @@
 				(lambda () res-code-faked)
 				stmt-handle))
 
-	   (data-len (bytevector-s64-native-ref ind-bv 0))
+	   (data-len (dbi-sql-bv-parse-sbigint ind-bv))
 	   (ret2 (call-check-res SQL_HANDLE_STMT
 				 (lambda ()
 				   (cond ((>= data-len 0) SQL_SUCCESS)
@@ -236,7 +231,7 @@
 				 stmt-handle)))
       (if (eq? data-len SQL_NO_DATA)
 	  '()
-	  (bv->string-length! buffer-bv data-len))))
+	  (bv->string-with-length! buffer-bv data-len))))
   
   (define (dbi-fetch-one cursor)
     (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor))))
