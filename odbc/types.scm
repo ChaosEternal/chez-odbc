@@ -1,7 +1,16 @@
 (library (odbc types)
   (export make-address-bv
 	  bv-ref-address
-	  bv->string-length!
+	  bv->string-with-length!
+	  dbi-sql-bv-parse-sshort
+	  dbi-sql-bv-parse-ushort
+	  dbi-sql-bv-parse-sint
+	  dbi-sql-bv-parse-uint
+	  dbi-sql-bv-parse-sbigint
+	  dbi-sql-bv-parse-ubigint
+	  dbi-sql-bv-parse-len
+	  dbi-sql-bv-parse-ulen
+	  
 	  SQL_CHAR    
 	  SQL_NUMERIC 
 	  SQL_DECIMAL 
@@ -45,51 +54,51 @@
 		       bytevector-s32-native-ref)))
       (lambda (bv)
 	(bv-ref bv 0))))
-  (define (bv->string-length! bv len)
-    (bytevector->string
-     (bytevector-truncate! bv len)
-     (make-transcoder (utf-8-codec))))
 
-  (define-syntax dbi-sql-bv-parse-sshort
+  (define-syntax  bv->string-with-length!
     (syntax-rules ()
-      ((_ x)
-       (bytevector-s16-native-ref x 0))))
-  
-  (define-syntax dbi-sql-bv-parse-ushort
-    (syntax-rules ()
-      ((_ x)
-       (bytevector-u16-native-ref x 0))))
+      ((_ bv len)
+       (bytevector->string
+	(bytevector-truncate! bv len)
+	(make-transcoder (utf-8-codec))))))
 
-  (define-syntax dbi-sql-bv-parse-sint
+  (define-syntax bv-parse-some
     (syntax-rules ()
-      ((_ x)
-       (bytevector-s32-native-ref x 0))))
+      ((_ x y)
+       (define-syntax x
+	 (syntax-rules ()
+	   ((_ xx)
+	    (x xx 0))
+	   ((_ xx n)
+	    (y xx n)))))))
 
-  (define-syntax dbi-sql-bv-parse-uint
+  (define-syntax bulk-def-parse-some
     (syntax-rules ()
-      ((_ x)
-       (bytevector-u32-native-ref x 0))))
+      ((_ (n t) rest)
+       (begin 
+	 (bv-parse-some n t)
+	 (bulk-def-parse-some rest)))
+      ((_ (n t))
+       (bv-parse-some n t))))
 
-  (define-syntax dbi-sql-bv-parse-sbigint
-    (syntax-rules ()
-      ((_ x)
-       (bytevector-s64-native-ref x 0))))
+  (bulk-def-parse-some
+   (dbi-sql-bv-parse-sshort   bytevector-s16-native-ref) 
+   (dbi-sql-bv-parse-ushort   bytevector-u16-native-ref)
+   (dbi-sql-bv-parse-sint     bytevector-s32-native-ref)
+   (dbi-sql-bv-parse-uint     bytevector-u32-native-ref)
+   (dbi-sql-bv-parse-sbigint  bytevector-s64-native-ref)
+   (dbi-sql-bv-parse-ubigint  bytevector-u64-native-ref)
+   (dbi-sql-bv-parse-len      bytevector-s64-native-ref)
+   (dbi-sql-bv-parse-ulen     bytevector-u64-native-ref)
+   )
+  ;; the defined syntaxes are equal as following
+  ;; (define-syntax dbi-sql-bv-parse-sshort
+  ;;   (syntax-rules ()
+  ;;     ((_ x)
+  ;;      (dbi-sql-bv-parse-sshort x 0))
+  ;;     ((_ x n)
+  ;;      (bytevector-s16-native-ref x n))))
 
-  (define-syntax dbi-sql-bv-parse-ubigint
-    (syntax-rules ()
-      ((_ x)
-       (bytevector-u64-native-ref x 0))))
 
-  (define-syntax dbi-sql-bv-parse-len
-    (syntax-rules ()
-      ((_ x)
-       (bytevector-s64-native-ref x 0))))
-
-  (define-syntax dbi-sql-bv-parse-ulen
-    (syntax-rules ()
-      ((_ x)
-       (bytevector-u64-native-ref x 0))))
-
-  
 
 )
