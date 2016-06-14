@@ -1,17 +1,17 @@
 (library (odbc dbi)
-  (export dbi-connect
-	  dbi-connect-raw
-	  dbi-disconnect
-	  dbi-commit
-	  dbi-rollback
-	  dbi-cursor
-	  dbi-query
-	  dbi-row-count
-	  dbi-ncols
-	  dbi-fetch-one
+  (export (rename (dbi-connect     connect     ))    
+	  (rename (dbi-connect-raw connect-raw ))
+	  (rename (dbi-disconnect  disconnect  ))
+	  (rename (dbi-commit      commit      ))
+	  (rename (dbi-rollback    rollback    ))
+	  (rename (dbi-cursor      cursor      ))
+	  (rename (dbi-query       query       ))
+	  (rename (dbi-row-count   row-count   ))
+	  (rename (dbi-ncols       ncols       ))
+	  (rename (dbi-fetch-one   fetch-one   ))
 	  ;; dbi-status
 	  ;; dbi-get-col-spec
-	   )
+	  )
   (import (chezscheme)
 	  (odbc base)
 	  (odbc types)
