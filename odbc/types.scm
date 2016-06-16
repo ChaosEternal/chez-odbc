@@ -12,7 +12,8 @@
 	  dbi-sql-bv-parse-ulen
 
 	  sql-type-convt-map
-
+	  mapping-sql-type
+	  
 	  SQL_VARCHAR
 	  
 	  SQL_CODE_DATE
@@ -267,6 +268,10 @@
 
   (define sql-type-convt-map (make-eq-hashtable))
 
+  (define (mapping-sql-type type)
+    (let ((dflt (hashtable-ref sql-type-convt-map SQL_DEFAULT #f)))
+      (hashtable-ref sql-type-convt-map type dflt)))
+  
   ;; hash-entry is (SQL_C_[TYPE] length convert-proc)
   ;; convert-proc is (lambda (bv length) ...)
   (for-each (lambda (T)
@@ -277,6 +282,7 @@
 			       (lambda (bv length)
 				 (bv->string-with-length! bv length)))))
 	    (list SQL_CHAR
+		  SQL_VARCHAR
 		  SQL_NUMERIC
 		  SQL_TYPE_DATE
 		  SQL_TYPE_TIME

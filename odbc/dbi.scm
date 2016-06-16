@@ -52,9 +52,11 @@
 		  (let* ([state (bv->string-with-length! state-bv 5)]
 			 [nsi (dbi-sql-bv-parse-sshort native-state-int-bv)]
 			 [l (dbi-sql-bv-parse-sshort message-l-bv)]
-			 [mess (bv->string-with-length! message-bv (- l 1))])
-		    (lp i (format #f "~a ERROR: ~a: ~a:~a:~a\n" m i
-				  state nsi mess)))
+			 [mess (if (> l 0)
+				   (bv->string-with-length! message-bv (- l 1))
+				   "")])
+		    (lp (+ 1 i) (format #f "~a ERROR: ~a: ~a:~a:~a\n" m i
+				     state nsi mess)))
 		  (make-message-condition m)))))))
 
   (define (call-check-res handle-type proc handle)
@@ -261,7 +263,7 @@
 	   (ret (call-check-res SQL_HANDLE_STMT
 				(lambda ()
 				  res-code-faked)
-				stmt-handle))
+				cursor))
 	   (row-count (if (eq? res-code SQL_NO_DATA)
 			  0
 			  (dbi-get-row-count stmt-handle)))
@@ -281,18 +283,29 @@
   (define (dbi-col-defs cursor)
     (odbc-dbi-cursor-coldef cursor))
 
-  (define (dbi-get-data cursor col-idx to-type)
+  (define (dbi-get-data cursor col-idx)
     (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
-	   (buffer-bv (make-bytevector 1024 0))
+	   (col-def (vector-ref (dbi-col-defs cursor) col-idx ))
+	   (col-len (cadr col-def))
+	   (col-type (caddr col-def))
+	   (col-type-covt (mapping-sql-type col-type))
+	   (target-type (car col-type-covt))
+	   (target-len (max col-len
+			    (if (cadr col-type-covt)
+				(cadr col-type-covt)
+				0)))
+	   (target-cvt-proc (caddr col-type-covt))
+	   (buffer-bv (make-bytevector (+ 4 target-len) 0))
 	   (ind-bv (make-bytevector 8 0))
-	   (res-code (f-sql-get-data stmt-handle col-idx SQL_C_CHAR buffer-bv ind-bv))
+	   (res-code (f-sql-get-data stmt-handle
+				     (+ 1 col-idx) target-type buffer-bv ind-bv))
 	   (res-code-faked (if (eq? res-code SQL_NO_DATA)
 			       SQL_SUCCESS
 			       res-code))
 
 	   (ret (call-check-res SQL_HANDLE_STMT
 				(lambda () res-code-faked)
-				stmt-handle))
+				cursor))
 
 	   (data-len (dbi-sql-bv-parse-sbigint ind-bv))
 	   (ret2 (call-check-res SQL_HANDLE_STMT
@@ -303,7 +316,9 @@
 				 cursor)))
       (if (eq? data-len SQL_NULL_DATA)
 	  '()
-	  (bv->string-with-length! buffer-bv data-len))))
+	  (if (not target-cvt-proc)
+	      buffer-bv
+	      (target-cvt-proc buffer-bv data-len)))))
 
   (define (dbi-fetch-one cursor)
     (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor))))
@@ -325,7 +340,7 @@
 			(begin
 			  (vector-set!
 			   r ci
-			   (dbi-get-data cursor (+ 1 ci) SQL_C_CHAR))
+			   (dbi-get-data cursor ci))
 			  (lp (+ 1 ci)))
 			r)))))))))
 
