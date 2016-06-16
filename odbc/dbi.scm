@@ -8,6 +8,7 @@
 	  (rename (dbi-query       query       ))
 	  (rename (dbi-row-count   row-count   ))
 	  (rename (dbi-ncols       ncols       ))
+	  (rename (dbi-col-defs    col-defs    ))
 	  (rename (dbi-fetch-one   fetch-one   ))
 	  ;; dbi-status
 	  ;; dbi-get-col-spec
@@ -26,7 +27,8 @@
     (fields (mutable stmt-handle)
 	    connection
 	    (mutable row-count)
-	    (mutable ncols)))
+	    (mutable ncols)
+	    (mutable coldef)))
 
   
   ;; exceptions processors
@@ -34,42 +36,47 @@
     (if (eq? handle 0)
 	(make-message-condition (format #f "Code: ~a ~a\n" handle-type res-code))
 	(let* ([message-bv (make-bytevector 128 0)]
-		  [state-bv (make-bytevector 6 0)]
-		  [native-state-int-bv (make-bytevector 4 0)]
-		  [message-l-bv (make-bytevector 4 0)])
+	       [state-bv (make-bytevector 6 0)]
+	       [native-state-int-bv (make-bytevector 4 0)]
+	       [message-l-bv (make-bytevector 4 0)])
 	  (let lp ((i 1)
 		   (m (format #f "Code: ~a ~a\n" handle-type res-code)))
-	       (let ((r (f-sql-get-diag-rec 2
-					    handle
-					    i
-					    state-bv
-					    native-state-int-bv
-					    message-bv
-					    message-l-bv)))
-		 (if (eq? r SQL_SUCCESS)
-		     (let* ([state (bv->string-with-length! state-bv 5)]
-			    [nsi (dbi-sql-bv-parse-sshort native-state-int-bv)]
-			    [l (dbi-sql-bv-parse-sshort message-l-bv)]
-			    [mess (bv->string-with-length! message-bv (- l 1))])
-		       (lp i (format #f "~a ERROR: ~a: ~a:~a:~a\n" m i
-				     state nsi mess)))
-		     (make-message-condition m)))))))
+	    (let ((r (f-sql-get-diag-rec 2
+					 handle
+					 i
+					 state-bv
+					 native-state-int-bv
+					 message-bv
+					 message-l-bv)))
+	      (if (eq? r SQL_SUCCESS)
+		  (let* ([state (bv->string-with-length! state-bv 5)]
+			 [nsi (dbi-sql-bv-parse-sshort native-state-int-bv)]
+			 [l (dbi-sql-bv-parse-sshort message-l-bv)]
+			 [mess (bv->string-with-length! message-bv (- l 1))])
+		    (lp i (format #f "~a ERROR: ~a: ~a:~a:~a\n" m i
+				  state nsi mess)))
+		  (make-message-condition m)))))))
 
   (define (call-check-res handle-type proc handle)
-    (let ((res (proc)))
+    (let ((res (proc))
+	  (handle-int
+	   (if (odbc-dbi-cursor? handle)
+	       (odbc-dbi-connection-dbc-handle
+		(odbc-dbi-cursor-connection handle))
+	       handle)))
       (cond ((eq? res SQL_SUCCESS) #t)
 	    ((eq? res SQL_SUCCESS_WITH_INFO) #t)
 	    (#t (raise (condition (make-sql-error)
-				  (sql-diag->conditions handle-type res handle)))))))
+				  (sql-diag->conditions handle-type res handle-int)))))))
   ;; low-level interfacesn
   (define (dbi-alloc-something what in-handle)
     (let* ((out-bv (make-address-bv))
 	   (res (call-check-res
 		 what (lambda ()
-				  (f-sql-alloc-handle
-				   what
-				   in-handle
-				   out-bv)) in-handle)))
+			(f-sql-alloc-handle
+			 what
+			 in-handle
+			 out-bv)) in-handle)))
       (bv-ref-address out-bv)))
 
   (define (dbi-alloc-env)
@@ -159,7 +166,7 @@
 
   (define (dbi-cursor connection)
     (let ((stmt-handle (box -1)))
-      (make-odbc-dbi-cursor  stmt-handle connection -1 -1)))
+      (make-odbc-dbi-cursor  stmt-handle connection -1 -1 #f)))
   
   (define refresh-stmt-handle
     (letrec* ((stmt-guardian (make-guardian))
@@ -182,6 +189,66 @@
 				   (lp)))))))
       (begin (collect-request-handler free-handle)
 	     p)))
+
+
+  (define dbi-get-all-col-defs
+    (lambda  (cursor ncols)
+      (if (< ncols  1)
+	  #f
+	  (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
+
+
+		 (coldefs (make-vector ncols)))
+	    (letrec-syntax
+		((get-cols-defs
+		  (syntax-rules ()
+		    ((_ (ic aname atype))
+		     (let* ((out-buff-bv (make-bytevector 340 0))
+			    (out-buff-len-bv (make-bytevector 4))
+			    (out-num-attr-bv (make-bytevector 8))
+			    (res-code (f-sql-col-attribute stmt-handle
+							   (+ 1 ic)
+							   aname
+							   out-buff-bv
+							   out-buff-len-bv
+							   out-num-attr-bv))
+
+			    (res-code-faked (if (eq? res-code SQL_NO_DATA)
+						SQL_SUCCESS
+						res-code))
+			    (ret (call-check-res SQL_HANDLE_STMT
+						 (lambda ()
+						   res-code-faked)
+						 cursor))
+
+			    (out (if (eq? atype 'n)
+				     (if (eq? res-code SQL_NO_DATA)
+					 0
+					 (dbi-sql-bv-parse-sshort
+					  ;; FIXME: should use correct type
+					  out-num-attr-bv))
+				     (if (eq? res-code SQL_NO_DATA)
+					 ""
+					 (bv->string-with-length!
+					  out-buff-bv
+					  (dbi-sql-bv-parse-sshort
+					   ;; FIXME: should use correct type
+					   out-buff-len-bv ))))))
+		       (cons out '()) ))
+		    ((_ (a0 a1 a2) (ak a3 a4) ...)
+		     (cons (car
+			    (get-cols-defs (a0 a1 a2)))
+		      (get-cols-defs (ak a3 a4) ...))))))
+	      (let lp ((ic 0))
+		(if (< ic ncols)
+		    (begin 
+		      (vector-set! coldefs ic
+				   (get-cols-defs
+				    (ic SQL_DESC_NAME 'c)
+				    (ic SQL_DESC_LENGTH 'n)
+				    (ic SQL_DESC_TYPE 'n)))
+		      (lp (+ 1 ic)))
+		    coldefs)))))))
   
   (define (dbi-query cursor sql)
     (let* ((s (refresh-stmt-handle cursor))
@@ -203,20 +270,25 @@
 		      (dbi-get-ncols stmt-handle))))
       (begin
 	(odbc-dbi-cursor-row-count-set! cursor row-count)
-	(odbc-dbi-cursor-ncols-set! cursor ncols))))
+	(odbc-dbi-cursor-ncols-set! cursor ncols)
+	(odbc-dbi-cursor-coldef-set! cursor (dbi-get-all-col-defs cursor ncols))
+	cursor)))
 
   (define (dbi-row-count cursor)
     (odbc-dbi-cursor-row-count cursor))
   (define (dbi-ncols cursor)
     (odbc-dbi-cursor-ncols cursor))
-  
-  (define (dbi-get-data stmt-handle col-idx to-type)
-    (let* ((buffer-bv (make-bytevector 1024 0))
+  (define (dbi-col-defs cursor)
+    (odbc-dbi-cursor-coldef cursor))
+
+  (define (dbi-get-data cursor col-idx to-type)
+    (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
+	   (buffer-bv (make-bytevector 1024 0))
 	   (ind-bv (make-bytevector 8 0))
 	   (res-code (f-sql-get-data stmt-handle col-idx SQL_C_CHAR buffer-bv ind-bv))
 	   (res-code-faked (if (eq? res-code SQL_NO_DATA)
-			      SQL_SUCCESS
-			      res-code))
+			       SQL_SUCCESS
+			       res-code))
 
 	   (ret (call-check-res SQL_HANDLE_STMT
 				(lambda () res-code-faked)
@@ -226,13 +298,13 @@
 	   (ret2 (call-check-res SQL_HANDLE_STMT
 				 (lambda ()
 				   (cond ((>= data-len 0) SQL_SUCCESS)
-					 ((eq? data-len SQL_NO_DATA) SQL_SUCCESS)
+					 ((eq? data-len SQL_NULL_DATA) SQL_SUCCESS)
 					 (#t SQL_ERROR)))
-				 stmt-handle)))
-      (if (eq? data-len SQL_NO_DATA)
+				 cursor)))
+      (if (eq? data-len SQL_NULL_DATA)
 	  '()
 	  (bv->string-with-length! buffer-bv data-len))))
-  
+
   (define (dbi-fetch-one cursor)
     (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor))))
       (if (< stmt-handle 0)
@@ -244,7 +316,7 @@
 				     res-code))
 		 (ret (call-check-res SQL_HANDLE_STMT
 				      (lambda () res-code-faked)
-				      stmt-handle)))
+				      cursor)))
 	    (if (or (eq? res-code SQL_NO_DATA) (< ncols 1))
 		#f
 		(let ((r (make-vector ncols)))
@@ -253,8 +325,8 @@
 			(begin
 			  (vector-set!
 			   r ci
-			   (dbi-get-data stmt-handle (+ 1 ci) SQL_C_CHAR))
+			   (dbi-get-data cursor (+ 1 ci) SQL_C_CHAR))
 			  (lp (+ 1 ci)))
-			r))))))))
-  )
-  
+			r)))))))))
+
+

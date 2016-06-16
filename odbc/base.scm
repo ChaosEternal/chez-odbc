@@ -10,6 +10,7 @@
 	  f-sql-ncols
 	  f-sql-fetch
 	  f-sql-get-data
+	  f-sql-col-attribute
 	  ;; f-make-odbc-cursor
 	  ;; f-init-odbc-env
 	  ;; f-init-odbc-hdl
@@ -30,7 +31,11 @@
 	  SQL_SUCCESS
 	  SQL_SUCCESS_WITH_INFO
 	  SQL_NO_DATA
+	  SQL_NULL_DATA
 	  SQL_ERROR
+	  SQL_DESC_NAME
+	  SQL_DESC_LENGTH
+	  SQL_DESC_TYPE
 	  
 	  )
   (import (chezscheme)
@@ -58,12 +63,13 @@
   (define SQL_SUCCESS            0)
   (define SQL_SUCCESS_WITH_INFO  1)
   (define SQL_NO_DATA            100)
+  (define SQL_NULL_DATA          -1)
   (define SQL_ERROR              -1)
 
   
-
-
-
+  (define SQL_DESC_NAME          1011)
+  (define SQL_DESC_TYPE          1002)
+  (define SQL_DESC_LENGTH        1003)
   
   (define-ftype
     f-cursor-space
@@ -159,5 +165,23 @@
 	 buffer-bv
 	 (bytevector-length buffer-bv)
 	 len-or-indicator-bv))))
+
+  (define f-sql-col-attribute
+    (let ((c-sql-col-attribute
+	   (foreign-procedure "SQLColAttribute" (void* int int u8* int u8* u8*) int)))
+      (lambda (stmt-handle
+	       col-idx
+	       field-id
+	       buffer-bv
+	       len-out-bv
+	       numerical-attr-out-bv)
+	(c-sql-col-attribute
+	 stmt-handle
+	 col-idx
+	 field-id
+	 buffer-bv
+	 (bytevector-length buffer-bv)
+	 len-out-bv
+	 numerical-attr-out-bv))))
   )
       
