@@ -36,6 +36,7 @@
 	  SQL_NUMERIC
 	  SQL_INTEGER
 	  SQL_SMALLINT
+	  SQL_FLOAT
 	  SQL_REAL
 	  SQL_DOUBLE
 	  SQL_TYPE_DATE
@@ -133,6 +134,7 @@
   (define SQL_NUMERIC 2)
   (define SQL_INTEGER 4)
   (define SQL_SMALLINT 5)
+  (define SQL_FLOAT 6)
   (define SQL_REAL 7)
   (define SQL_DOUBLE 8)
 
@@ -281,7 +283,7 @@
 			       SQL_C_CHAR #f
 			       (lambda (bv length)
 				 (bv->string-with-length! bv length)))))
-	    (list SQL_CHAR
+	    (list SQL_CHAR		;; all these types are mapped to string
 		  SQL_VARCHAR
 		  SQL_NUMERIC
 		  SQL_TYPE_DATE
@@ -294,7 +296,7 @@
 		  SQL_BIT
 		  SQL_GUID
 		  SQL_WCHAR
-		  SQL_DEFAULT))
+		  SQL_DEFAULT))		
 
   (hashtable-set! sql-type-convt-map
 		  SQL_INTEGER 
@@ -309,6 +311,13 @@
 		   SQL_C_SHORT (ftype-sizeof short)
 		   (lambda (bv length)
 		     (dbi-sql-bv-parse-sshort bv) )))
+
+  (hashtable-set! sql-type-convt-map
+		  SQL_FLOAT
+		  (list
+		   SQL_C_FLOAT (ftype-sizeof short)
+		   (lambda (bv length)
+		     (dbi-sql-bv-parse-float bv) )))
 
   (hashtable-set! sql-type-convt-map
 		  SQL_REAL 
