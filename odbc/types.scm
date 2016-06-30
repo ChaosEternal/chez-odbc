@@ -12,7 +12,7 @@
 	  dbi-sql-bv-parse-ulen
 
 	  sql-type-convt-map
-	  mapping-sql-type
+	  map-sql-type
 	  
 	  SQL_VARCHAR
 	  
@@ -46,6 +46,9 @@
 	  SQL_TIME
 	  SQL_TIMESTAMP
 	  SQL_BINARY
+	  SQL_VARBINARY
+	  SQL_LONGVARBINARY
+	  
 	  SQL_BIGINT
 	  SQL_TINYINT
 	  SQL_BIT
@@ -146,7 +149,11 @@
   (define SQL_DATE 9)
   (define SQL_TIME 10)
   (define SQL_TIMESTAMP 11)
+
   (define SQL_BINARY -2)
+  (define SQL_VARBINARY -3)
+  (define SQL_LONGVARBINARY -4)
+  
   (define SQL_BIGINT -5)
   (define SQL_TINYINT -6)
   (define SQL_BIT -7)
@@ -270,7 +277,7 @@
 
   (define sql-type-convt-map (make-eq-hashtable))
 
-  (define (mapping-sql-type type)
+  (define (map-sql-type type)
     (let ((dflt (hashtable-ref sql-type-convt-map SQL_DEFAULT #f)))
       (hashtable-ref sql-type-convt-map type dflt)))
   
@@ -292,7 +299,6 @@
 		  SQL_DATE
 		  SQL_TIME
 		  SQL_TIMESTAMP
-		  SQL_BINARY
 		  SQL_BIT
 		  SQL_GUID
 		  SQL_WCHAR
@@ -339,11 +345,14 @@
   ;; 		   SQL_C_CHAR #f
   ;; 		   (lambda (bv length)
   ;; 		     (bv->string-with-length! bv length) )))
-
-  (hashtable-set! sql-type-convt-map
-		  SQL_BINARY
-		  (list
-		   SQL_C_BINARY #f #f))
+  (for-each (lambda (t)
+	      (hashtable-set! sql-type-convt-map
+			      t
+			      (list
+			       SQL_C_BINARY #f bytevector-truncate!)))
+	    (list SQL_BINARY
+		  SQL_VARBINARY
+		  SQL_LONGVARBINARY))
 
   (hashtable-set! sql-type-convt-map
 		  SQL_BIGINT
@@ -358,6 +367,4 @@
 		   SQL_C_SHORT (ftype-sizeof short)
 		   (lambda (bv length)
 		     (dbi-sql-bv-parse-sshort bv) )))
-
-
   )
