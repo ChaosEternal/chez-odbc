@@ -7,9 +7,12 @@
 	  (rename (dbi-cursor      cursor      ))
 	  (rename (dbi-query       query       ))
 	  (rename (dbi-row-count   row-count   ))
-	  (rename (dbi-ncols       ncols       ))
+	  (rename (dbi-ncols       number-of-columns       ))
 	  (rename (dbi-col-defs    col-defs    ))
 	  (rename (dbi-fetch-one   fetch-one   ))
+	  (rename (map-sql-type    default-map-sql-type))
+	  (rename (dbi-cursor-type-map-proc-set!
+		                   cursor-type-map-proc-set!))
 	  ;; dbi-status
 	  ;; dbi-get-col-spec
 	  )
@@ -28,9 +31,10 @@
 	    connection
 	    (mutable row-count)
 	    (mutable ncols)
-	    (mutable coldef)))
+	    (mutable coldef)
+	    (mutable type-map-proc)))
 
-  
+
   ;; exceptions processors
   (define (sql-diag->conditions handle-type res-code handle)
     (if (eq? handle 0)
@@ -87,7 +91,7 @@
     (dbi-alloc-something SQL_HANDLE_DBC env-handle))
   (define (dbi-alloc-stmt dbc-handle)
     (dbi-alloc-something SQL_HANDLE_STMT dbc-handle))
-
+
   (define (dbi-call-and-get-long proc what in-handle)
     (let* ((out-bv (make-bytevector 8 0))
 	   (res (call-check-res
@@ -109,6 +113,7 @@
 				      dsn
 				      out-dsn-bv
 				      out-dsn-bv-l)) dbc-handle))
+
   ;; make connection
   ;; input: raw dsn: DSN=xxx;UID=xxx;...
   ;; output: connection 
@@ -138,6 +143,7 @@
 				     0))])
 		  (make-odbc-dbi-connection env-handle dbc-handle
 					    out-dsn)))))))))
+
   ;; input: dsn_without_"DSN=" uid [pwd]
   ;;        dns_with_"DSN="
   ;; output: connection
@@ -168,7 +174,7 @@
 
   (define (dbi-cursor connection)
     (let ((stmt-handle (box -1)))
-      (make-odbc-dbi-cursor  stmt-handle connection -1 -1 #f)))
+      (make-odbc-dbi-cursor  stmt-handle connection -1 -1 #f #f)))
   
   (define refresh-stmt-handle
     (letrec* ((stmt-guardian (make-guardian))
@@ -192,14 +198,12 @@
       (begin (collect-request-handler free-handle)
 	     p)))
 
-
+
   (define dbi-get-all-col-defs
     (lambda  (cursor ncols)
       (if (< ncols  1)
 	  #f
 	  (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
-
-
 		 (coldefs (make-vector ncols)))
 	    (letrec-syntax
 		((get-cols-defs
@@ -251,7 +255,7 @@
 				    (ic SQL_DESC_TYPE 'n)))
 		      (lp (+ 1 ic)))
 		    coldefs)))))))
-  
+  
   (define (dbi-query cursor sql)
     (let* ((s (refresh-stmt-handle cursor))
 	   (stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
@@ -283,12 +287,14 @@
   (define (dbi-col-defs cursor)
     (odbc-dbi-cursor-coldef cursor))
 
-  (define (dbi-get-data cursor col-idx)
+  (define (dbi-get-data cursor col-idx type-convt)
     (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
 	   (col-def (vector-ref (dbi-col-defs cursor) col-idx ))
 	   (col-len (cadr col-def))
 	   (col-type (caddr col-def))
-	   (col-type-covt (mapping-sql-type col-type))
+	   (col-type-covt ((if type-convt
+			       type-convt
+			       map-sql-type) col-type))
 	   (target-type (car col-type-covt))
 	   (target-len (max col-len
 			    (if (cadr col-type-covt)
@@ -320,6 +326,9 @@
 	      buffer-bv
 	      (target-cvt-proc buffer-bv data-len)))))
 
+  (define dbi-cursor-type-map-proc-set!
+    odbc-dbi-cursor-type-map-proc-set!)
+  
   (define (dbi-fetch-one cursor)
     (let* ((stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor))))
       (if (< stmt-handle 0)
@@ -331,7 +340,8 @@
 				     res-code))
 		 (ret (call-check-res SQL_HANDLE_STMT
 				      (lambda () res-code-faked)
-				      cursor)))
+				      cursor))
+		 (type-map (odbc-dbi-cursor-type-map-proc cursor)))
 	    (if (or (eq? res-code SQL_NO_DATA) (< ncols 1))
 		#f
 		(let ((r (make-vector ncols)))
@@ -340,7 +350,7 @@
 			(begin
 			  (vector-set!
 			   r ci
-			   (dbi-get-data cursor ci))
+			   (dbi-get-data cursor ci type-map))
 			  (lp (+ 1 ci)))
 			r)))))))))
 
