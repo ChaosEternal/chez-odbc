@@ -2,3 +2,50 @@
 
 this is library for chez-scheme connecting to ODBC datasources.
 
+* Usage
+
+** Procedure: connect
+   Usage: (connect /Datasource UID [PWD]/)
+   Usage: (connect /DSN/)
+   
+   Create an odbc connect to datasource.
+   
+   #+BEGIN_SRC
+   (import (prefix (odbc dbi) dbi:))
+   ;;Procedure connect
+   (define c (dbi:connect (getenv "DSN")))
+   #+END_SRC
+
+** Procedure: cursor
+   Usage: (cursor /connect/)
+   
+   Alloc a cursor object, all queries go through cursor.
+
+   #+BEGIN_SRC
+   (define cs (dbi:cursor c))
+   #+END_SRC
+
+** Procedure: query
+   Usage: (query /cursor sql/)
+   
+   Execute query.
+   
+   #+BEGIN_SRC
+   (dbi:query cc "select now()")
+   #+END_SRC
+
+** Procedure: commit, rollback
+   Usage: (commit /connect/)
+   Usage: (rollback /connect/)
+
+   Commit/Rollback transactions on connection: /connect/
+
+** Procedure: row-count, number-of-columns, col-defs
+   Usage: (row-count /cursor/)
+   Usage: (number-of-columns /cursor/)
+   Usage: (col-defs /cursor/)
+   
+   col-defs returns: (column-name column-type column-size)
+
+** Procedure: cursor-type-map-proc-set!
+   Usage: Set a type-map-proc for cursor
