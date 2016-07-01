@@ -11,7 +11,8 @@ this is library for chez-scheme connecting to ODBC datasources.
       - (*connect* /DSN/)
    
     Create an odbc connect to datasource.
-   
+
+    Example:
     #+BEGIN_SRC scheme
     (import (prefix (odbc dbi) dbi:))
     ;;Procedure connect
@@ -23,7 +24,8 @@ this is library for chez-scheme connecting to ODBC datasources.
       - (*cursor* /connect/)
    
     Alloc a cursor object, all queries go through cursor.
-
+    
+    Example:
     #+BEGIN_SRC scheme
     (define cs (dbi:cursor c))
     #+END_SRC
@@ -34,6 +36,7 @@ this is library for chez-scheme connecting to ODBC datasources.
    
     Execute query.
    
+    Example:
     #+BEGIN_SRC scheme
     (dbi:query cc "select now()")
     #+END_SRC
@@ -59,10 +62,50 @@ this is library for chez-scheme connecting to ODBC datasources.
 
     Fetches one row from result.
     Returns a vector of values.
+    Example:
+
+    #+BEGIN_SRC scheme
+   (let lp ((d (dbi:fetch-one cc)))
+     (if d
+	 (begin
+	   (format (current-output-port)
+		   "~a\n" ;;(pretty-print)
+		   d)
+	   (lp (dbi:fetch-one cc))
+	   )))
+     #+END_SRC
 
 *** Procedure: cursor-type-map-proc-set!
     - Usage:
-      - (*cursor-type-map-proc-set!* /cursor/ /type-map-def/)
+      - (*cursor-type-map-proc-set!* /cursor/ /type-map-proc/)
+	- type-map-proc is a proc takes an integer(sql-type) and returns a list:
+          (convert-code length convert-proc)
+	  convert-code sql-type code is defined in (odbc types) as in sqlext.h and sql.h
+	  length could be #f which means use column-definition's length
+          convert-proc takes a bytevector and a length and returns data in desired type
+
+    Example:
+    #+BEGIN_SRC scheme
+    (import (prefix (odbc dbi) dbi:)
+	(odbc types))
+
+    (define DSN (getenv "DSN"))
+
+    (define c (dbi:connect DSN))
+    (define cc (dbi:cursor c))
+
+    (define (timemap x)
+	(if (pair? (memq x (list SQL_TYPE_TIME
+	                         SQL_TYPE_DATE
+				 SQL_DATE
+				 SQL_TIME
+				 SQL_TIMESTAMP)))
+            (list SQL_C_TIMESTAMP 200
+                  bytevector-truncate!)
+	    (dbi:default-map-sql-type x)))
+
+    (dbi:cursor-type-map-proc-set! cc timemap)
+    #+END_SRC
 
 * Copyright
   Chaos Eternal (c) 2016
