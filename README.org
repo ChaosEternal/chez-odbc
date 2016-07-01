@@ -1,13 +1,15 @@
 * Scheme-odbc
 
 this is library for chez-scheme connecting to ODBC datasources.
-
+* License
+  LGPLv3+
 * Usage
 
 ** Procedures
 *** Procedure: connect
-    - Usage: (connect /Datasource UID [PWD]/)
-    - Usage: (connect /DSN/)
+    - Usage:
+      - (*connect* /Datasource UID [PWD]/)
+      - (*connect* /DSN/)
    
     Create an odbc connect to datasource.
    
@@ -18,7 +20,8 @@ this is library for chez-scheme connecting to ODBC datasources.
     #+END_SRC
 
 *** Procedure: cursor
-    - Usage: (cursor /connect/)
+    - Usage:
+      - (*cursor* /connect/)
    
     Alloc a cursor object, all queries go through cursor.
 
@@ -27,7 +30,8 @@ this is library for chez-scheme connecting to ODBC datasources.
     #+END_SRC
 
 *** Procedure: query
-    - Usage: (query /cursor sql/)
+    - Usage: 
+      - (*query* /cursor sql/)
    
     Execute query.
    
@@ -36,17 +40,30 @@ this is library for chez-scheme connecting to ODBC datasources.
     #+END_SRC
 
 *** Procedure: commit, rollback
-    - Usage: (commit /connect/)
-    - Usage: (rollback /connect/)
+    - Usage: 
+      - (*commit* /connect/)
+      - (*rollback* /connect/)
 
     Commit/Rollback transactions on connection: /connect/
 
 *** Procedure: row-count, number-of-columns, col-defs
-    - Usage: (row-count /cursor/)
-    - Usage: (number-of-columns /cursor/)
-    - Usage: (col-defs /cursor/)
+    - Usage: 
+      - (*row-count* /cursor/)
+      - (*number-of-columns* /cursor/)
+      - (*col-defs* /cursor/)
    
-    col-defs returns: (column-name column-type column-size)
+    col-defs returns: vector of (column-name column-type column-size)
+
+*** Procedure: fetch-one
+    - Usage:
+      - (*fetch-one* /cursor/)
+
+    Fetches one row from result.
+    Returns a vector of values.
 
 *** Procedure: cursor-type-map-proc-set!
-    Usage: Set a type-map-proc for cursor
+    - Usage:
+      - (*cursor-type-map-proc-set!* /cursor/ /type-map-def/)
+
+* Copyright
+  Chaos Eternal (c) 2016
