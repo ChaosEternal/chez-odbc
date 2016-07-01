@@ -4,7 +4,6 @@ this is library for chez-scheme connecting to ODBC datasources.
 * License
   LGPLv3+
 * Usage
-
 ** Procedures
 *** Procedure: connect
     - Usage:
@@ -13,7 +12,7 @@ this is library for chez-scheme connecting to ODBC datasources.
    
     Create an odbc connect to datasource.
    
-    #+BEGIN_SRC
+    #+BEGIN_SRC scheme
     (import (prefix (odbc dbi) dbi:))
     ;;Procedure connect
     (define c (dbi:connect (getenv "DSN")))
@@ -25,7 +24,7 @@ this is library for chez-scheme connecting to ODBC datasources.
    
     Alloc a cursor object, all queries go through cursor.
 
-    #+BEGIN_SRC
+    #+BEGIN_SRC scheme
     (define cs (dbi:cursor c))
     #+END_SRC
 
@@ -35,7 +34,7 @@ this is library for chez-scheme connecting to ODBC datasources.
    
     Execute query.
    
-    #+BEGIN_SRC
+    #+BEGIN_SRC scheme
     (dbi:query cc "select now()")
     #+END_SRC
 
