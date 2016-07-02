@@ -147,7 +147,7 @@
   (define f-sql-free-handle
     (foreign-procedure "SQLFreeHandle" (int void*) int))
   (define f-sql-direct-execute
-    (foreign-procedure "SQLExecDirect" (void* string int) int))
+    (foreign-procedure "SQLExecDirect" (void* u8* int) int))
   (define f-sql-row-count
     (foreign-procedure "SQLRowCount" (void* u8*) int))
   (define f-sql-ncols

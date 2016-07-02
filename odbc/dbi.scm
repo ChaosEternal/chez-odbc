@@ -259,8 +259,9 @@
   (define (dbi-query cursor sql)
     (let* ((s (refresh-stmt-handle cursor))
 	   (stmt-handle (unbox (odbc-dbi-cursor-stmt-handle cursor)))
-	   (sql-len (string-length sql))
-	   (res-code (f-sql-direct-execute stmt-handle sql sql-len))
+	   (sql-bv (string->bytevector sql (make-transcoder (utf-8-codec))))
+	   (sql-len (bytevector-length sql-bv))
+	   (res-code (f-sql-direct-execute stmt-handle sql-bv sql-len))
 	   (res-code-faked (if (eq? res-code SQL_NO_DATA)
 			       SQL_SUCCESS
 			       res-code))

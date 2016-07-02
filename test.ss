@@ -28,7 +28,8 @@
 	"select now()"
 	"select * from pg_attribute"
 	"select 'abc'::bytea"
-	"select 'abcadasdadasdlakdjalkdjaldjadsadsajdlajdlajdslajdlajdlajdlajdlajdlajdlajdlaksjdadjaljdajdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddadjsklllllllllllllllllllllllllllllllllllllllllllllllllllllla'::bytea")
+	"select 'abcadasdadasdlakdjalkdjaldjadsadsajdlajdlajdslajdlajdlajdlajdlajdlajdlajdlaksjdadjaljdajdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddadjsklllllllllllllllllllllllllllllllllllllllllllllllllllllla'::bytea"
+	"select '中文'::bytea")
  )
 
 
