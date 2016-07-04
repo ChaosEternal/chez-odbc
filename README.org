@@ -1,4 +1,4 @@
-* Scheme-odbc
+* Chez-odbc
 
 this is library for chez-scheme connecting to ODBC datasources.
 * License
